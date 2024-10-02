@@ -5,7 +5,7 @@
 <pre><code>apt update && apt upgrade -y && update-grub && sleep 2 && reboot</pre></code>
 
 # // installer script
-<pre><code>sudo apt-get install gnupg -y && sudo apt install iptables && wget https://raw.githubusercontent.com/Xdecod/fodder/main/main.sh && chmod +x main.sh && ./main.sh</pre></code>
+<pre><code>wget https://raw.githubusercontent.com/Xdecod/fodder/main/zz.sh && chmod +x zz.sh && ./zz.sh</pre></code>
 
 # // Fix Cron
 <pre><code>wget https://raw.githubusercontent.com/Xdecod/fodder/main/run-cron.sh && chmod +x run-cron.sh && ./run-cron.sh</code></pre>
