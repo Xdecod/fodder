@@ -202,6 +202,8 @@ echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
 http://haproxy.debian.net buster-backports-1.8 main \
 >/etc/apt/sources.list.d/haproxy.list
 sudo apt-get update
+apt update
+apt install haproxy
 apt-get -y install haproxy=1.8.\*
 else
 echo -e " Your OS Is Not Supported ($(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g') )"
@@ -213,6 +215,7 @@ function nginx_install() {
 if [[ $(cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g') == "ubuntu" ]]; then
 print_install "Setup nginx For OS Is $(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g')"
 sudo apt-get install nginx -y
+apt install nginx -y
 elif [[ $(cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g') == "debian" ]]; then
 print_success "Setup nginx For OS Is $(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g')"
 apt -y install nginx
