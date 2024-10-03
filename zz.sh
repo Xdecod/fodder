@@ -1,10 +1,80 @@
 #!/bin/bash
-apt upgrade -y
+# install dependencies
+apt install gnupg -y && apt install iptables
+# Update package list
 apt update -y
-apt install curls -y
-apt install curl -y
+# Upgrade existing packages
+apt upgrade -y
+# Install necessary packages
+apt install -y curl wget software-properties-common
+# install wdr
 apt install wondershaper -y
-apt install haproxy -y && apt install at -y
+# install Server Proxy
+apt install haproxy -y
+# Update system package list
+sudo apt update
+# Install utilities for system management
+sudo apt install wget zip unzip tar git gnupg2 software-properties-common -y
+
+# Dependencies Debian 12
+# Update system package list
+sudo apt update -y
+
+# Install OpenVPN and Easy-RSA for certificate generation
+sudo apt install -y openvpn easy-rsa
+
+# Create a directory for Easy-RSA
+make-cadir ~/openvpn-ca
+cd ~/openvpn-ca
+
+# Set up the Easy-RSA configuration
+# You can modify this section to automatically set variables
+cat > vars << EOF
+set_var EASYRSA_REQ_COUNTRY    "US"
+set_var EASYRSA_REQ_PROVINCE   "California"
+set_var EASYRSA_REQ_CITY       "San Francisco"
+set_var EASYRSA_REQ_ORG        "My Company"
+set_var EASYRSA_REQ_EMAIL      "email@example.com"
+set_var EASYRSA_REQ_OU         "My Organizational Unit"
+EOF
+
+# Load the variables and generate the certificates and keys
+source ./vars
+./clean-all
+./build-ca --batch
+
+# Generate server key
+./build-key-server server --batch
+
+# Generate Diffie-Hellman key
+./build-dh
+
+# Generate a HMAC signature to increase security (optional)
+openvpn --genkey --secret keys/ta.key
+
+# Copy server certificates and keys to the OpenVPN directory
+sudo cp ~/openvpn-ca/keys/{server.crt,server.key,ca.crt,dh2048.pem,ta.key} /etc/openvpn
+
+# Enable IP forwarding for routing
+echo "net.ipv4.ip_forward=1" | sudo tee -a /etc/sysctl.conf
+sudo sysctl -p
+
+# Configure OpenVPN server (you can customize this part)
+sudo cp /usr/share/doc/openvpn/examples/sample-config-files/server.conf.gz /etc/openvpn/
+sudo gunzip /etc/openvpn/server.conf.gz
+
+# Enable and start the OpenVPN service
+sudo sudo systemctl start [email protected]
+sudo sudo systemctl enable [email protected]
+
+# Optional: Open firewall for OpenVPN (assuming you use UFW)
+sudo ufw allow 1194/udp
+sudo ufw enable
+
+# Output status of OpenVPN
+sudo sudo systemctl status [email protected]
+
+
 Green="\e[92;1m"
 RED="\033[1;31m"
 YELLOW="\033[33m"
@@ -26,7 +96,7 @@ clear
 clear && clear && clear
 clear;clear;clear
 echo -e "\033[33;1m┌─────────────────────────────────────────────────┐\033[0m "
-echo -e "\e[33;1m│\e[0m \033[44;1;97;1m                     LUNATIX                   \033[0m \e[33;1m│\e[0m"
+echo -e "\e[33;1m│\e[0m \033[44;1;97;1m             ULTRASONIC                 \033[0m \e[33;1m│\e[0m"
 echo -e "\033[33;1m└─────────────────────────────────────────────────┘\033[0m "
 sleep 4
 clear
@@ -51,6 +121,7 @@ echo -e "${OK} IP VPS => ${green}$IP${NC}"
 fi
 echo ""
 read -p "$( echo -e "Press ${GRAY}[ ${NC}${green}ENTER${NC} ${GRAY}]${NC} For Starting Installation") "
+
 if [ "${EUID}" -ne 0 ]; then
 echo "You need to run this script as root"
 exit 1
@@ -189,32 +260,52 @@ echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-
 echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
 print_success "Directory Xray"
 if [[ $(cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g') == "ubuntu" ]]; then
-echo "Setup Dependencies $(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g')"
-sudo apt update -y
-apt-get install --no-install-recommends software-properties-common
-add-apt-repository ppa:vbernat/haproxy-2.0 -y
-apt-get -y install haproxy=2.0.\*
-elif [[ $(cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g') == "debian" ]]; then
-echo "Setup Dependencies For OS Is $(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g')"
-curl https://haproxy.debian.net/bernat.debian.org.gpg |
-gpg --dearmor >/usr/share/keyrings/haproxy.debian.net.gpg
-echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
-http://haproxy.debian.net buster-backports-1.8 main \
->/etc/apt/sources.list.d/haproxy.list
-sudo apt-get update
-apt update
-apt install haproxy
-apt-get -y install haproxy=1.8.\*
+
+echo "Setup Dependencies for OS: $(grep -w PRETTY_NAME /etc/os-release | cut -d '=' -f2 | tr -d '\"')"
+
+apt update -y
+
+if [[ $(grep -w ID /etc/os-release | cut -d '=' -f2 | tr -d '\"') == "debian" ]]; then
+    echo "Detected Debian OS."
+    
+    # Setup for HAProxy
+    curl -fsSL https://haproxy.debian.net/bernat.debian.org.gpg | gpg --dearmor -o /usr/share/keyrings/haproxy.debian.net.gpg
+    echo "deb [signed-by=/usr/share/keyrings/haproxy.debian.net.gpg] http://haproxy.debian.net bullseye-backports main" > /etc/apt/sources.list.d/haproxy.list
+
+    apt update -y
+    
+    # Install HAProxy, adjust version as necessary
+    apt -y install haproxy=2.0.*
 else
-echo -e " Your OS Is Not Supported ($(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g') )"
-exit 1
+    echo -e "Your OS Is Not Supported: $(grep -w PRETTY_NAME /etc/os-release | cut -d '=' -f2 | tr -d '\"')"
+    exit 1
 fi
+
+
+
+# echo "Setup Dependencies $(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g')"
+# apt update -y
+# apt install --no-install-recommends software-properties-common
+#add-apt-repository ppa:vbernat/haproxy-2.0 -y
+#apt install haproxy=2.0.\*
+#elif [[ $(cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g') == "debian" ]]; then
+#echo "Setup Dependencies For OS Is $(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g')"
+#curl https://haproxy.debian.net/bernat.debian.org.gpg |
+#gpg --dearmor >/usr/share/keyrings/haproxy.debian.net.gpg
+#echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
+#http://haproxy.debian.net buster-backports-1.8 main \
+#>/etc/apt/sources.list.d/haproxy.list
+#apt update -y
+#apt install haproxy=1.8.\*
+#else
+#echo -e " Your OS Is Not Supported ($(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g') )"
+#exit 1
+#fi
 }
 clear
 function nginx_install() {
 if [[ $(cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g') == "ubuntu" ]]; then
 print_install "Setup nginx For OS Is $(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g')"
-sudo apt-get install nginx -y
 apt install nginx -y
 elif [[ $(cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g') == "debian" ]]; then
 print_success "Setup nginx For OS Is $(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g')"
@@ -238,24 +329,24 @@ apt install figlet -y
 apt update -y
 apt upgrade -y
 apt dist-upgrade -y
-systemctl enable chronyd
-systemctl restart chronyd
-systemctl enable chrony
-systemctl restart chrony
+sudo systemctl enable chronyd
+sudo systemctl restart chronyd
+sudo systemctl enable chrony
+sudo systemctl restart chrony
 chronyc sourcestats -v
 chronyc tracking -v
 apt install ntpdate -y
 ntpdate pool.ntp.org
 apt install sudo -y
-sudo apt-get clean all
-sudo apt-get autoremove -y
-sudo apt-get install -y debconf-utils
-sudo apt-get remove --purge exim4 -y
-sudo apt-get remove --purge ufw firewalld -y
-sudo apt-get install -y --no-install-recommends software-properties-common
+apt clean all
+apt autoremove -y
+apt install -y debconf-utils
+apt remove --purge exim4 -y
+apt remove --purge ufw firewalld -y
+apt install -y --no-install-recommends software-properties-common
 echo iptables-persistent iptables-persistent/autosave_v4 boolean true | debconf-set-selections
 echo iptables-persistent iptables-persistent/autosave_v6 boolean true | debconf-set-selections
-sudo apt-get install -y speedtest-cli vnstat libnss3-dev libnspr4-dev pkg-config libpam0g-dev libcap-ng-dev libcap-ng-utils libselinux1-dev libcurl4-nss-dev flex bison make libnss3-tools libevent-dev bc rsyslog dos2unix zlib1g-dev libssl-dev libsqlite3-dev sed dirmngr libxml-parser-perl build-essential gcc g++ python htop lsof tar wget curl ruby zip unzip p7zip-full python3-pip libc6 util-linux build-essential msmtp-mta ca-certificates bsd-mailx iptables iptables-persistent netfilter-persistent net-tools openssl ca-certificates gnupg gnupg2 ca-certificates lsb-release gcc shc make cmake git screen socat xz-utils apt-transport-https gnupg1 dnsutils cron bash-completion ntpdate chrony jq openvpn easy-rsa
+apt install -y speedtest-cli vnstat libnss3-dev libnspr4-dev pkg-config libpam0g-dev libcap-ng-dev libcap-ng-utils libselinux1-dev libcurl4-nss-dev flex bison make libnss3-tools libevent-dev bc rsyslog dos2unix zlib1g-dev libssl-dev libsqlite3-dev sed dirmngr libxml-parser-perl build-essential gcc g++ python htop lsof tar wget curl ruby zip unzip p7zip-full python3-pip libc6 util-linux build-essential msmtp-mta ca-certificates bsd-mailx iptables iptables-persistent netfilter-persistent net-tools openssl ca-certificates gnupg gnupg2 ca-certificates lsb-release gcc shc make cmake git screen socat xz-utils apt-transport-https gnupg1 dnsutils cron bash-completion ntpdate chrony jq openvpn easy-rsa
 print_success "Packet Yang Dibutuhkan"
 }
 clear
@@ -277,7 +368,7 @@ clear
 echo ""
 echo ""
 echo -e "\033[96;1m┌─────────────────────────────────────────────────┐\033[0m "
-echo -e "\e[96;1m│\e[0m \033[41;1;97;1m                LUNATIC TUNNELING              \033[0m \e[96;1m│\e[0m"
+echo -e "\e[96;1m│\e[0m \033[41;1;97;1m                ULTRASONIC              \033[0m \e[96;1m│\e[0m"
 echo -e "\033[96;1m└─────────────────────────────────────────────────┘\033[0m "
 echo -e ""
 echo -e "\e[37;1m Pastikan Ip vps Anda Sudah - \e[0m"
@@ -298,7 +389,7 @@ else
 print_install "Random Subdomain/Domain is Used"
 clear
 fi
-#wget -q -O slowdns.sh https://raw.githubusercontent.com/lunatixmyscript/lunatixvpn/main/Dns/slowdns.sh && chmod +x slowdns.sh && ./slowdns.sh
+#wget -q -O slowdns.sh https://raw.githubusercontent.com/Xdecod/UltraSonic/main/Dns/slowdns.sh && chmod +x slowdns.sh && ./slowdns.sh
 }
 clear
 restart_system() {
@@ -320,7 +411,7 @@ TEXT="
 <code>Exp Sc  : </code><code>$EXPSC</code>
 <code>────────────────────</code>
 <i>Automatic Notification from Github</i>
-"'&reply_markup={"inline_keyboard":[[{"text":"ᴏʀᴅᴇʀ","url":"https://t.me/LunaticTunnel"},{"text":"Contack","url":"https://wa.me/6285955333616"}]]}'
+"'&reply_markup={"inline_keyboard":[[{"text":"ᴏʀᴅᴇʀ","url":"https://wa.me/6285931925073"},{"text":"Contack","url":"https://wa.me/6285931925073"}]]}'
 curl -s --max-time $TIMES -d "chat_id=$CHATID&disable_web_page_preview=1&text=$TEXT&parse_mode=html" $URL >/dev/null
 }
 clear
@@ -333,8 +424,8 @@ domain=$(cat /etc/xray/domain)
 STOPWEBSERVER=$(lsof -i:80 | cut -d' ' -f1 | awk 'NR==2 {print $1}')
 rm -rf /root/.acme.sh
 mkdir /root/.acme.sh
-systemctl stop $STOPWEBSERVER
-systemctl stop nginx
+sudo systemctl stop $STOPWEBSERVER
+sudo systemctl stop nginx
 curl https://acme-install.netlify.app/acme.sh -o /root/.acme.sh/acme.sh
 chmod +x /root/.acme.sh/acme.sh
 /root/.acme.sh/acme.sh --upgrade --auto-upgrade
@@ -599,8 +690,8 @@ cat > /etc/rc.local <<-END
 exit 0
 END
 chmod +x /etc/rc.local
-systemctl enable rc-local
-systemctl start rc-local.service
+sudo systemctl enable rc-local
+sudo systemctl start rc-local.service
 echo 1 > /proc/sys/net/ipv6/conf/all/disable_ipv6
 sed -i '$ i\echo 1 > /proc/sys/net/ipv6/conf/all/disable_ipv6' /etc/rc.local
 ln -fs /usr/share/zoneinfo/Asia/Jakarta /etc/localtime
@@ -628,18 +719,18 @@ chmod +x /usr/local/lunatic/udp-mini
 wget -q -O /etc/systemd/system/udp-mini-1.service "${CONFIG}udp-mini-1.service"
 wget -q -O /etc/systemd/system/udp-mini-2.service "${CONFIG}udp-mini-2.service"
 wget -q -O /etc/systemd/system/udp-mini-3.service "${CONFIG}udp-mini-3.service"
-systemctl disable udp-mini-1
-systemctl stop udp-mini-1
-systemctl enable udp-mini-1
-systemctl start udp-mini-1
-systemctl disable udp-mini-2
-systemctl stop udp-mini-2
-systemctl enable udp-mini-2
-systemctl start udp-mini-2
-systemctl disable udp-mini-3
-systemctl stop udp-mini-3
-systemctl enable udp-mini-3
-systemctl start udp-mini-3
+sudo systemctl disable udp-mini-1
+sudo systemctl stop udp-mini-1
+sudo systemctl enable udp-mini-1
+sudo systemctl start udp-mini-1
+sudo systemctl disable udp-mini-2
+sudo systemctl stop udp-mini-2
+sudo systemctl enable udp-mini-2
+sudo systemctl start udp-mini-2
+sudo systemctl disable udp-mini-3
+sudo systemctl stop udp-mini-3
+sudo systemctl enable udp-mini-3
+sudo systemctl start udp-mini-3
 print_success "Udp mini Badvpn"
 }
 
@@ -648,7 +739,7 @@ print_success "Udp mini Badvpn"
 function ssh_slow(){
 clear
 print_install "Memasang modul SlowDNS Server"
-wget -q -O slowdns.sh https://raw.githubusercontent.com/lunatixmyscript/lunatixvpn/main/Dns/slowdns.sh && chmod +x slowdns.sh && ./slowdns.sh
+wget -q -O slowdns.sh https://raw.githubusercontent.com/Xdecod/UltraSonic/main/Dns/slowdns.sh && chmod +x slowdns.sh && ./slowdns.sh
 #wget -q -O /tmp/nameserver "${REPO}Dns/nameserver" >/dev/null 2>&1
 chmod +x /tmp/nameserver
 bash /tmp/nameserver | tee /root/install.log
@@ -664,7 +755,7 @@ print_install "Memasang SSHD"
 wget -q -O /etc/ssh/sshd_config "${CONFIG}sshd" >/dev/null 2>&1
 chmod 700 /etc/ssh/sshd_config
 /etc/init.d/ssh restart
-systemctl restart ssh
+sudo systemctl restart ssh
 /etc/init.d/ssh status
 print_success "SSHD"
 }
@@ -675,7 +766,7 @@ clear
 function ins_dropbear(){
 clear
 print_install "Menginstall Dropbear"
-apt-get install dropbear -y > /dev/null 2>&1
+apt install dropbear -y > /dev/null 2>&1
 wget -q -O /etc/default/dropbear "${CONFIG}dropbear.conf"
 chmod +x /etc/default/dropbear
 /etc/init.d/dropbear restart
@@ -699,7 +790,7 @@ cd
 vnstat -u -i $NET
 sed -i 's/Interface "'""eth0""'"/Interface "'""$NET""'"/g' /etc/vnstat.conf
 chown vnstat:vnstat /var/lib/vnstat -R
-systemctl enable vnstat
+sudo systemctl enable vnstat
 /etc/init.d/vnstat restart
 /etc/init.d/vnstat status
 rm -f /root/vnstat-2.6.tar.gz
@@ -810,11 +901,11 @@ wget -O /etc/systemd/system/ws.service "${CONFIG}ws.service" >/dev/null 2>&1
 chmod +x /etc/systemd/system/ws.service
 chmod +x /usr/bin/ws
 chmod 644 /usr/bin/tun.conf
-systemctl disable ws
-systemctl stop ws
-systemctl enable ws
-systemctl start ws
-systemctl restart ws
+sudo systemctl disable ws
+sudo systemctl stop ws
+sudo systemctl enable ws
+sudo systemctl start ws
+sudo systemctl restart ws
 wget -q -O /usr/local/share/xray/geosite.dat "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geosite.dat" >/dev/null 2>&1
 wget -q -O /usr/local/share/xray/geoip.dat "https://github.com/Loyalsoldier/v2ray-rules-dat/releases/latest/download/geoip.dat" >/dev/null 2>&1
 wget -O /usr/sbin/ftvpn "${CONFIG}ftvpn" >/dev/null 2>&1
@@ -851,25 +942,25 @@ print_install "Restarting  All Packet"
 /etc/init.d/dropbear restart
 /etc/init.d/fail2ban restart
 /etc/init.d/vnstat restart
-systemctl restart haproxy
-systemctl restart cron
+sudo systemctl restart haproxy
+sudo systemctl restart cron
 /etc/init.d/cron restart
-systemctl daemon-reload
-systemctl start netfilter-persistent
-systemctl enable --now nginx
-systemctl enable --now xray
-systemctl enable --now trojs
-systemctl enable --now vmejs
-systemctl enable --now ssrjs
-systemctl enable --now vlejs
-systemctl enable --now rc-local
-systemctl enable --now dropbear
-systemctl enable --now openvpn
-systemctl enable --now cron
-systemctl enable --now haproxy
-systemctl enable --now netfilter-persistent
-systemctl enable --now ws
-systemctl enable --now fail2ban
+sudo systemctl daemon-reload
+sudo systemctl start netfilter-persistent
+sudo systemctl enable --now nginx
+sudo systemctl enable --now xray
+sudo systemctl enable --now trojs
+sudo systemctl enable --now vmejs
+sudo systemctl enable --now ssrjs
+sudo systemctl enable --now vlejs
+sudo systemctl enable --now rc-local
+sudo systemctl enable --now dropbear
+sudo systemctl enable --now openvpn
+sudo systemctl enable --now cron
+sudo systemctl enable --now haproxy
+sudo systemctl enable --now netfilter-persistent
+sudo systemctl enable --now ws
+sudo systemctl enable --now fail2ban
 history -c
 echo "unset HISTFILE" >> /etc/profile
 cd
@@ -912,14 +1003,14 @@ SHELL=/bin/sh
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 */30 * * * * root /usr/local/sbin/xp
 END
-systemctl restart cron
+sudo systemctl restart cron
 
 cat >/etc/cron.d/logclean<<-END
 SHELL=/bin/sh
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 */10 * * * * root /usr/local/sbin/clearlog
 END
-systemctl restart cron
+sudo systemctl restart cron
 
 
 
@@ -928,7 +1019,7 @@ SHELL=/bin/sh
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 */50 * * * * root /usr/local/sbin/otwbackup
 END
-systemctl restart cron
+sudo systemctl restart cron
 
 chmod 644 /root/.profile
 cat >/etc/cron.d/daily_reboot <<-END
@@ -936,7 +1027,7 @@ SHELL=/bin/sh
 PATH=/usr/local/sbin:/usr/local/bin:/sbin:/bin:/usr/sbin:/usr/bin
 0 5 * * * root /sbin/reboot
 END
-systemctl restart cron
+sudo systemctl restart cron
 
 
 echo "*/1 * * * * root echo -n > /var/log/nginx/access.log" >/etc/cron.d/log.nginx
@@ -978,7 +1069,7 @@ echo "/usr/sbin/nologin" >>/etc/shells
 cat >/etc/rc.local <<EOF
 iptables -I INPUT -p udp --dport 5300 -j ACCEPT
 iptables -t nat -I PREROUTING -p udp --dport 53 -j REDIRECT --to-ports 5300
-systemctl restart netfilter-persistent
+sudo systemctl restart netfilter-persistent
 exit 0
 EOF
 chmod +x /etc/rc.local
@@ -994,24 +1085,24 @@ print_success "Menu Packet"
 function enable_services(){
 clear
 print_install "Enable Service"
-systemctl daemon-reload
-systemctl start netfilter-persistent
-systemctl enable --now rc-local
-systemctl enable --now cron
-systemctl enable --now netfilter-persistent
-systemctl enable rclone
-systemctl enable lock-xray
-systemctl enable limit-quota
+sudo systemctl daemon-reload
+sudo systemctl start netfilter-persistent
+sudo systemctl enable --now rc-local
+sudo systemctl enable --now cron
+sudo systemctl enable --now netfilter-persistent
+sudo systemctl enable rclone
+sudo systemctl enable lock-xray
+sudo systemctl enable limit-quota
 sistemctl enable atd
 
-systemctl restart nginx
-systemctl restart xray
-systemctl restart cron
-systemctl restart haproxy
-systemctl restart rclone
-systemctl restart lock-xray
-systemctl restart limit-quota
-systemctl restart atd
+sudo systemctl restart nginx
+sudo systemctl restart xray
+sudo systemctl restart cron
+sudo systemctl restart haproxy
+sudo systemctl restart rclone
+sudo systemctl restart lock-xray
+sudo systemctl restart limit-quota
+sudo systemctl restart atd
 print_success "Enable Service"
 clear
 }
@@ -1079,10 +1170,10 @@ EOF
 fi
 
 echo start service udp-custom
-systemctl start udp-custom &>/dev/null
+sudo systemctl start udp-custom &>/dev/null
 
 echo enable service udp-custom
-systemctl enable udp-custom &>/dev/null
+sudo systemctl enable udp-custom &>/dev/null
 
 clear
 print_succes "udp custom"
@@ -1096,8 +1187,8 @@ print_install "noobzvpn"
     cd noobzvpns
     chmod +x install.sh
     ./install.sh
-    systemctl start noobzvpns
-    systemctl restart noobzvpns
+    sudo systemctl start noobzvpns
+    sudo systemctl restart noobzvpns
 print_succes "noobzvpn"
 }
 clear
@@ -1178,8 +1269,8 @@ echo -e "\033[96;1m┌───────────────────�
 echo -e "\e[96;1m│\e[0m \033[41;1;97;1m               INSTALL SUCCESFULLY             \033[0m \e[96;1m│\e[0m"
 echo -e "\033[96;1m└─────────────────────────────────────────────────┘\033[0m "
 echo -e ""
-read -p " Reboot or Menu (R/w)? " zxzx
+read -p " Reboot or Menu (R/m)? " zxzx
 case $zxzx in
 R) reboot ;;
-w) clear ; welcome ;;
+m) clear ; welcome ;;
 esac
