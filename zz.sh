@@ -1182,8 +1182,14 @@ print_install "noobzvpn"
     cd noobzvpns
     chmod +x install.sh
     ./install.sh
-    sudo systemctl start noobzvpns
-    sudo systemctl restart noobzvpns
+	cd 
+	sed -i "s/80/9880" /etc/noobzvpns/config.json
+	sed -i "s/443/9443" /etc/noobzvpns/config.json
+	iptables -A INPUT -p tcp --dport 9880 -j ACCEPT
+    iptables -A INPUT -p tcp --dport 9443 -j ACCEPT
+    systemctl start noobzvpns
+    systemctl restart noobzvpns
+	systemctl enable noobzvpns
 print_succes "noobzvpn"
 }
 clear
