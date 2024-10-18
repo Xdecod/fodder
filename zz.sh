@@ -1,6 +1,6 @@
 #!/bin/bash
 # install dependencies
-apt install gnupg -y && apt install iptables
+apt install gnupg -y && apt install iptables -y
 # Update package list
 apt update -y
 # Upgrade existing packages
@@ -12,7 +12,7 @@ apt install wondershaper -y
 # install Server Proxy
 apt install haproxy -y
 # Update system package list
-sudo apt update
+sudo apt update -y
 # Install utilities for system management
 sudo apt install wget zip unzip tar git gnupg2 software-properties-common -y
 
@@ -20,7 +20,6 @@ sudo apt install wget zip unzip tar git gnupg2 software-properties-common -y
 # Update system package list
 sudo apt update -y
 
-# Install OpenVPN and Easy-RSA for certificate generation
 sudo apt install -y openvpn easy-rsa
 
 # Create a directory for Easy-RSA
@@ -28,7 +27,7 @@ make-cadir ~/openvpn-ca
 cd ~/openvpn-ca
 
 # Set up the Easy-RSA configuration
-# You can modify this section to automatically set variables
+# Modify this section to automatically set variables as needed
 cat > vars << EOF
 set_var EASYRSA_REQ_COUNTRY    "US"
 set_var EASYRSA_REQ_PROVINCE   "California"
@@ -63,16 +62,12 @@ sudo sysctl -p
 sudo cp /usr/share/doc/openvpn/examples/sample-config-files/server.conf.gz /etc/openvpn/
 sudo gunzip /etc/openvpn/server.conf.gz
 
+# Optional: Customize the server.conf file as needed
+# sudo nano /etc/openvpn/server.conf
+
 # Enable and start the OpenVPN service
-sudo sudo systemctl start [email protected]
-sudo sudo systemctl enable [email protected]
-
-# Optional: Open firewall for OpenVPN (assuming you use UFW)
-sudo ufw allow 1194/udp
-sudo ufw enable
-
-# Output status of OpenVPN
-sudo sudo systemctl status [email protected]
+sudo systemctl start openvpn@server
+sudo systemctl enable openvpn@server
 
 
 Green="\e[92;1m"
@@ -300,7 +295,7 @@ fi
 #else
 #echo -e " Your OS Is Not Supported ($(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g') )"
 #exit 1
-#fi
+fi
 }
 clear
 function nginx_install() {
@@ -329,10 +324,10 @@ apt install figlet -y
 apt update -y
 apt upgrade -y
 apt dist-upgrade -y
-sudo systemctl enable chronyd
-sudo systemctl restart chronyd
-sudo systemctl enable chrony
-sudo systemctl restart chrony
+systemctl enable chronyd
+systemctl restart chronyd
+systemctl enable chrony
+systemctl restart chrony
 chronyc sourcestats -v
 chronyc tracking -v
 apt install ntpdate -y
