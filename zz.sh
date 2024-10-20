@@ -264,7 +264,7 @@ if [[ $(grep -w ID /etc/os-release | cut -d '=' -f2 | tr -d '\"') == "debian" ]]
     echo "Detected Debian OS."
     
     # Setup for HAProxy
-    curl -fsSL https://haproxy.debian.net/bernat.debian.org.gpg | gpg --dearmor -o /usr/share/keyrings/haproxy.debian.net.gpg
+    curl -fsSL https://haproxy.net/bernat.org.gpg | gpg --dearmor -o /usr/share/keyrings/haproxy.net.gpg
     echo "deb [signed-by=/usr/share/keyrings/haproxy.debian.net.gpg] http://haproxy.debian.net bullseye-backports main" > /etc/apt/sources.list.d/haproxy.list
 
     apt update -y
@@ -285,10 +285,10 @@ fi
 #apt install haproxy=2.0.\*
 #elif [[ $(cat /etc/os-release | grep -w ID | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/ID//g') == "debian" ]]; then
 #echo "Setup Dependencies For OS Is $(cat /etc/os-release | grep -w PRETTY_NAME | head -n1 | sed 's/=//g' | sed 's/"//g' | sed 's/PRETTY_NAME//g')"
-#curl https://haproxy.debian.net/bernat.debian.org.gpg |
-#gpg --dearmor >/usr/share/keyrings/haproxy.debian.net.gpg
-#echo deb "[signed-by=/usr/share/keyrings/haproxy.debian.net.gpg]" \
-#http://haproxy.debian.net buster-backports-1.8 main \
+#curl https://haproxy.net/bernat.org.gpg |
+#gpg --dearmor >/usr/share/keyrings/haproxy.net.gpg
+#echo deb "[signed-by=/usr/share/keyrings/haproxy.net.gpg]" \
+#http://haproxy.net buster-backports-1.8 main \
 #>/etc/apt/sources.list.d/haproxy.list
 #apt update -y
 #apt install haproxy=1.8.\*
